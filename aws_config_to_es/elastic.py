@@ -2,12 +2,14 @@ import datetime
 import json
 import logging
 import requests
-
+from requests.auth import HTTPBasicAuth
 
 class ElasticSearch(object):
 
-    def __init__(self, connections=None, log=None):
+    def __init__(self, connections=None, log=None, username=None, password=None):
 
+        self.auth = None
+        self.headers = {'Content-Type': 'application/json'}
         if connections is None:
             self.connections = "localhost:9200"
         else:
@@ -17,6 +19,9 @@ class ElasticSearch(object):
             self.log = log
         else:
             self.log = logging.getLogger("elastic")
+
+        if username is not None:
+            self.auth = HTTPBasicAuth(username, password)
 
         self.log.debug("Setting up the initial connection")
 
@@ -42,11 +47,13 @@ class ElasticSearch(object):
             response = requests.put(self.connections + "/" +
                                     index_name + "/" +
                                     doc_type + "/" +
-                                    index_id, data=json_message)
+                                    index_id, data=json_message, 
+                                    headers=self.headers, auth=self.auth)
         else:
             response = requests.post(self.connections + "/" +
                                      index_name + "/" +
-                                     doc_type, data=json_message)
+                                     doc_type, data=json_message, 
+                                     headers=self.headers, auth=self.auth)
 
         self.log.info(
             "response: " + str(
@@ -98,4 +105,4 @@ class ElasticSearch(object):
         }
         requests.put(
             self.connections + "/_template/configservice",
-            data=json.dumps(payload))
+            data=json.dumps(payload), headers=self.headers, auth=self.auth)

@@ -20,7 +20,8 @@ DOWNLOADED_SNAPSHOT_FILE_NAME = "/tmp/configsnapshot" + \
 REGIONS = [
     'us-west-1', 'us-west-2', 'eu-west-1', 'us-east-1',
     'eu-central-1', 'ap-southeast-1', 'ap-northeast-1',
-    'ap-southeast-2', 'ap-northeast-2', 'sa-east-1']
+    'ap-southeast-2', 'ap-northeast-2', 'sa-east-1',
+    'cn-north-1', 'cn-northwest-1']
 
 
 def get_configuration_snapshot_file(s3conn, bucket_name, file_partial_name):
@@ -60,7 +61,7 @@ def load_data_into_es(filename, iso_now_time, es):
         if len(configuration_items) > 0:
             for item in configuration_items:
                 try:
-                    indexname = item.get("resourceType").lower()
+                    indexname = item.get("resourceType").lower().replace(':','-')
                     typename = item.get("awsRegion").lower()
 
                     verbose_log.info(
@@ -151,8 +152,8 @@ def loop_through_regions(cur_region, iso_now_time, es):
         app_log.info("Added: " + str(item_count) +
                      " items into ElasticSearch from " + cur_region)
     if could_not_add > 0:
-        app_log.warn("Couldn't add " + str(could_not_add) +
-                     " to ElasticSearch. Maybe you have permission issues? ")
+        app_log.warning("Couldn't add " + str(could_not_add) +
+                        " to ElasticSearch. Maybe you have permission issues? ")
 
 
 def main(args, es):
@@ -187,6 +188,10 @@ if __name__ == "__main__":
     parser.add_argument('--verbose', '-v', action='store_true', default=False,
                         help='If selected, the app runs in verbose mode '
                              '-- a lot more logs!')
+    parser.add_argument('--username', '-u', 
+                        help='The elastic search username.')
+    parser.add_argument('--password', '-p',
+                        help='The elastic search password.')
     args = parser.parse_args()
 
     logging.basicConfig(format=' %(name)-12s:  %(message)s')
@@ -209,16 +214,26 @@ if __name__ == "__main__":
         "botocore.vendored.requests.packages.urllib3.connectionpool").setLevel(
         level=logging.FATAL)
     logging.getLogger("boto3").setLevel(level=logging.FATAL)
-    logging.getLogger("requests").setLevel(level=logging.FATAL)
+    logging.getLogger("requests").setLevel(level=logging.DEBUG)
 
-    destination = None
-    if args.destination is None:
+    #destination = None
+    #if args.destination is None:
+    #    app_log.error(
+    #        "You need to enter the IP of your ElasticSearch instance")
+    #    exit()
+
+    if (args.username is None and args.password is not None):
         app_log.error(
-            "You need to enter the IP of your ElasticSearch instance")
+            "You need to enter elastic search username")
         exit()
 
-    destination = "http://" + args.destination
+    if (args.username is not None and args.password is None):
+        app_log.error(
+            "You need to enter elastic search password")
+        exit()
+
+    destination = args.destination
 
     verbose_log.info("Setting up the elasticsearch instance")
 
-    main(args, elastic.ElasticSearch(connections=destination, log=verbose_log))
+    main(args, elastic.ElasticSearch(connections=destination, log=verbose_log, username=args.username, password=args.password))
